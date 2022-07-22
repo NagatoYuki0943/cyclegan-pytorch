@@ -39,7 +39,7 @@ if __name__ == "__main__":
     #---------------------------------------------------------------------#
     fp16            = False
     #--------------------------------------------------------------------------#
-    #   如果想要断点续练就将model_path设置成logs文件夹下已经训练的权值文件。 
+    #   如果想要断点续练就将model_path设置成logs文件夹下已经训练的权值文件。
     #   当model_path = ''的时候不加载整个模型的权值。
     #
     #   此处使用的是整个模型的权重，因此是在train.py进行加载的。
@@ -53,14 +53,14 @@ if __name__ == "__main__":
     #   输入图像大小的设置
     #-------------------------------#
     input_shape     = [256, 256]
-    
+
     #------------------------------#
     #   训练参数设置
     #------------------------------#
     Init_Epoch      = 0
     Epoch           = 200
     batch_size      = 2
-    
+
     #------------------------------------------------------------------#
     #   其它训练参数：学习率、优化器、学习率下降有关
     #------------------------------------------------------------------#
@@ -96,14 +96,14 @@ if __name__ == "__main__":
     #------------------------------------------------------------------#
     #   num_workers     用于设置是否使用多线程读取数据
     #                   开启后会加快数据读取速度，但是会占用更多内存
-    #                   内存较小的电脑可以设置为2或者0  
+    #                   内存较小的电脑可以设置为2或者0
     #------------------------------------------------------------------#
     num_workers         = 4
     #------------------------------#
     #   每隔50个step保存一次图片
     #------------------------------#
     photo_save_step     = 50
-    
+
     #------------------------------------------#
     #   获得图片路径
     #------------------------------------------#
@@ -148,7 +148,6 @@ if __name__ == "__main__":
     if D_model_B_path != '':
         pretrained_dict = torch.load(D_model_B_path, map_location=device)
         D_model_B.load_state_dict(pretrained_dict)
-    
     #----------------------#
     #   获得损失函数
     #----------------------#
@@ -163,7 +162,7 @@ if __name__ == "__main__":
         loss_history    = LossHistory(log_dir, [G_model_A2B, G_model_B2A, D_model_A, D_model_B], input_shape=input_shape)
     else:
         loss_history    = None
-        
+
     #------------------------------------------------------------------#
     #   torch 1.2不支持amp，建议使用torch 1.7.1及以上正确使用fp16
     #   因此torch1.2这里显示"could not be resolve"
@@ -178,23 +177,23 @@ if __name__ == "__main__":
     G_model_B2A_train = G_model_B2A.train()
     D_model_A_train = D_model_A.train()
     D_model_B_train = D_model_B.train()
-    
+
     if Cuda:
         if distributed:
             G_model_A2B_train = G_model_A2B_train.cuda(local_rank)
             G_model_A2B_train = torch.nn.parallel.DistributedDataParallel(G_model_A2B_train, device_ids=[local_rank], find_unused_parameters=True)
-            
+
             G_model_B2A_train = G_model_B2A_train.cuda(local_rank)
             G_model_B2A_train = torch.nn.parallel.DistributedDataParallel(G_model_B2A_train, device_ids=[local_rank], find_unused_parameters=True)
-            
+
             D_model_A_train = D_model_A_train.cuda(local_rank)
             D_model_A_train = torch.nn.parallel.DistributedDataParallel(D_model_A_train, device_ids=[local_rank], find_unused_parameters=True)
-            
+
             D_model_B_train = D_model_B_train.cuda(local_rank)
             D_model_B_train = torch.nn.parallel.DistributedDataParallel(D_model_B_train, device_ids=[local_rank], find_unused_parameters=True)
         else:
             cudnn.benchmark = True
-            
+
             G_model_A2B_train = torch.nn.DataParallel(G_model_A2B_train)
             G_model_A2B_train = G_model_A2B_train.cuda()
 
@@ -206,7 +205,7 @@ if __name__ == "__main__":
 
             D_model_B_train = torch.nn.DataParallel(D_model_B_train)
             D_model_B_train = D_model_B_train.cuda()
-    
+
     #---------------------------#
     #   读取数据集对应的txt
     #---------------------------#
@@ -236,12 +235,12 @@ if __name__ == "__main__":
             'adam'  : optim.Adam(itertools.chain(G_model_A2B_train.parameters(), G_model_B2A_train.parameters()), lr=Init_lr, betas=(momentum, 0.999), weight_decay = weight_decay),
             'sgd'   : optim.SGD(itertools.chain(G_model_A2B_train.parameters(), G_model_B2A_train.parameters()), Init_lr, momentum = momentum, nesterov=True)
         }[optimizer_type]
-        
+
         D_optimizer_A = {
             'adam'  : optim.Adam(D_model_A_train.parameters(), lr=Init_lr, betas=(momentum, 0.999), weight_decay = weight_decay),
             'sgd'   : optim.SGD(D_model_A_train.parameters(), Init_lr, momentum = momentum, nesterov=True)
         }[optimizer_type]
-        
+
         D_optimizer_B = {
             'adam'  : optim.Adam(D_model_B_train.parameters(), lr=Init_lr, betas=(momentum, 0.999), weight_decay = weight_decay),
             'sgd'   : optim.SGD(D_model_B_train.parameters(), Init_lr, momentum = momentum, nesterov=True)
@@ -251,7 +250,7 @@ if __name__ == "__main__":
         #   获得学习率下降的公式
         #---------------------------------------#
         lr_scheduler_func = get_lr_scheduler(lr_decay_type, Init_lr, Min_lr, Epoch)
-        
+
         #---------------------------------------#
         #   判断每一个世代的长度
         #---------------------------------------#
@@ -263,7 +262,7 @@ if __name__ == "__main__":
         #   构建数据集加载器。
         #---------------------------------------#
         train_dataset   = CycleGanDataset(annotation_lines_A, annotation_lines_B, input_shape)
-        
+
         if distributed:
             train_sampler   = torch.utils.data.distributed.DistributedSampler(train_dataset, shuffle=True,)
             batch_size      = batch_size // ngpus_per_node
@@ -271,7 +270,7 @@ if __name__ == "__main__":
         else:
             train_sampler   = None
             shuffle         = True
-    
+
         gen             = DataLoader(train_dataset, shuffle=shuffle, batch_size=batch_size, num_workers=num_workers, pin_memory=True,
                                     drop_last=True, collate_fn=CycleGan_dataset_collate, sampler=train_sampler)
 
@@ -282,11 +281,11 @@ if __name__ == "__main__":
 
             if distributed:
                 train_sampler.set_epoch(epoch)
-                
+
             set_optimizer_lr(G_optimizer, lr_scheduler_func, epoch)
             set_optimizer_lr(D_optimizer_A, lr_scheduler_func, epoch)
             set_optimizer_lr(D_optimizer_B, lr_scheduler_func, epoch)
-            
+
             fit_one_epoch(G_model_A2B_train, G_model_B2A_train, D_model_A_train, D_model_B_train, G_model_A2B, G_model_B2A, D_model_A, D_model_B, loss_history,
                         G_optimizer, D_optimizer_A, D_optimizer_B, BCE_loss, MSE_loss, epoch, epoch_step, gen, Epoch, Cuda, fp16, scaler, save_period, save_dir, photo_save_step, local_rank)
 

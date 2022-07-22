@@ -14,7 +14,7 @@ if __name__ == "__main__":
         if type_name not in classes:
             continue
         cls_id = classes.index(type_name)
-        
+
         photos_path = os.path.join(datasets_path, type_name)
         photos_name = os.listdir(photos_path)
         for photo_name in photos_name:
