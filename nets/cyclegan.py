@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 
 #----------------------------------------#
-#   残差快,通道宽高都不变
+#   残差块,通道宽高都不变
 #   主干: 3x3Conv -> IN -> ReLU -> 3x3Conv -> IN
 #   直接拼接输入的x
 #   IN: 假设 [b,c,h,w], 在 hw 上计算, b*c*hw
@@ -70,7 +70,7 @@ class generator(nn.Module):
         )
 
         #----------------------------------#
-        #   Residual blocks
+        #   9 Residual blocks
         #   [b, 256, h/4, w/4] -> [b, 256, h/4, w/4]
         #----------------------------------#
         self.stage_4 = []

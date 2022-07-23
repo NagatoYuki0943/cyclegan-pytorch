@@ -18,28 +18,63 @@ def fit_one_epoch(G_model_A2B_train, G_model_B2A_train, D_model_A_train, D_model
     for iteration, batch in enumerate(gen):
         if iteration >= epoch_step:
             break
-        
+
+        # 每一个batch有2个种类的图像
         images_A, images_B = batch[0], batch[1]
         batch_size  = images_A.size()[0]
+        # real全为1 fake全为0
         y_real      = torch.ones(batch_size)
         y_fake      = torch.zeros(batch_size)
-        
+
         with torch.no_grad():
             if cuda:
                 images_A, images_B, y_real, y_fake  = images_A.cuda(local_rank), images_B.cuda(local_rank), y_real.cuda(local_rank), y_fake.cuda(local_rank)
 
         if not fp16:
-            #---------------------------------#
+            #----------------------------------------------------------------------------#
             #   训练生成器A2B和B2A
-            #---------------------------------#
+            #   两个生成器使用同一个优化器(参数放在一起)
+            #
+            #        images_A                              images_B
+            #       ┌───┴───┐                              ┌───┴───┐
+            #     B2A()     │                            A2B()     │
+            #       │       │                              │       │
+            #    Same_A     │                           Same_B     │
+            #       └───┬───┘                              └───┬───┘
+            #       MSE_loss()                             MSE_loss()
+            #           │                                      │
+            #    loss_identity_A                        loss_identity_B
+            #
+            #        images_A                              images_B
+            #    ┌───────┤                             ┌───────┤
+            #    │     A2B()                           │     B2A()
+            #    │       │                             │       │
+            #    │    fake_B                           │    fake_A
+            #    │       ├───────┐                     │       ├───────┐
+            #    │     B2A()    D_B()                  │     A2B()    D_A()
+            #    │       │       │                     │       │       │
+            #    │     rec_A  pred_fake  y_real        │     rec_B  pred_fake  y_real
+            #    └───┬───┘       └────┬────┘           └───┬───┘       └────┬────┘
+            #    MSE_loss()       BCE_loss()           MSE_loss()       BCE_loss()
+            #        │                │                    │                │
+            #  loss_cycle_ABA    loss_GAN_A2B        loss_cycle_BAB    loss_GAN_B2A
+            #----------------------------------------------------------------------------#
             G_optimizer.zero_grad()
-            
+
+            #--------------------------------------------------#
+            #   A2B(B2A)放入原图images_B(images_A),将得到的结果
+            #   Same_B(Same_A)和原图images_B(images_A)对比求loss
+            #--------------------------------------------------#
             Same_B          = G_model_A2B_train(images_B)
             loss_identity_B = MSE_loss(Same_B, images_B)
-            
+
             Same_A          = G_model_B2A_train(images_A)
             loss_identity_A = MSE_loss(Same_A, images_A)
-            
+
+            #--------------------------------------------------#
+            #   A2B(B2A)放入A(B),得到fake_B(fake_A),
+            #   再放入对应的Dis模型得到置信度,然后的1对比得到loss
+            #--------------------------------------------------#
             fake_B          = G_model_A2B_train(images_A)
             pred_fake       = D_model_B_train(fake_B)
             loss_GAN_A2B    = BCE_loss(pred_fake, y_real)
@@ -47,7 +82,11 @@ def fit_one_epoch(G_model_A2B_train, G_model_B2A_train, D_model_A_train, D_model
             fake_A          = G_model_B2A_train(images_B)
             pred_fake       = D_model_A_train(fake_A)
             loss_GAN_B2A    = BCE_loss(pred_fake, y_real)
-            
+
+            #--------------------------------------------------#
+            #   将fake_B(fake_A)放入B2A(A2B)得到rec_A(rec_B)
+            #   并与原图images_A(images_B)对比得到loss
+            #--------------------------------------------------#
             recovered_A     = G_model_B2A_train(fake_B)
             loss_cycle_ABA  = MSE_loss(recovered_A, images_A)
 
@@ -57,10 +96,19 @@ def fit_one_epoch(G_model_A2B_train, G_model_B2A_train, D_model_A_train, D_model
             G_loss = loss_identity_A * 5.0 + loss_identity_B * 5.0 + loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA * 10.0 + loss_cycle_BAB * 10.0
             G_loss.backward()
             G_optimizer.step()
-                
-            #---------------------------------#
+
+            #----------------------------------------------------------------#
             #   训练评价器A
-            #---------------------------------#
+            #    images_A                fake_A 上面的images_B放入B2A()得到的
+            #       │                      │
+            #     D_A()                  D_A()
+            #       │                      │
+            #   pred_real y_real       pred_fake y_fake
+            #       └───┬───┘              └───┬───┘
+            #       BCE_loss()             BCE_loss()
+            #           │                      │
+            #      loss_D_real            loss_D_fake
+            #----------------------------------------------------------------#
             D_optimizer_A.zero_grad()
             pred_real   = D_model_A_train(images_A)
             loss_D_real = BCE_loss(pred_real, y_real)
@@ -71,10 +119,19 @@ def fit_one_epoch(G_model_A2B_train, G_model_B2A_train, D_model_A_train, D_model
             D_loss_A    = (loss_D_real + loss_D_fake) * 0.5
             D_loss_A.backward()
             D_optimizer_A.step()
-            
-            #---------------------------------#
+
+            #----------------------------------------------------------------#
             #   训练评价器B
-            #---------------------------------#
+            #    images_B                fake_B 上面的images_A放入A2B()得到的
+            #       │                      │
+            #     D_B()                  D_B()
+            #       │                      │
+            #   pred_real y_real       pred_fake y_fake
+            #       └───┬───┘              └───┬───┘
+            #       BCE_loss()             BCE_loss()
+            #           │                      │
+            #      loss_D_real            loss_D_fake
+            #----------------------------------------------------------------#
             D_optimizer_B.zero_grad()
 
             pred_real   = D_model_B_train(images_B)
@@ -97,19 +154,19 @@ def fit_one_epoch(G_model_A2B_train, G_model_B2A_train, D_model_A_train, D_model
                 G_optimizer.zero_grad()
                 Same_B          = G_model_A2B_train(images_B)
                 loss_identity_B = MSE_loss(Same_B, images_B)
-                
+
                 Same_A          = G_model_B2A_train(images_A)
                 loss_identity_A = MSE_loss(Same_A, images_A)
-                
+
                 fake_B          = G_model_A2B_train(images_A)
                 pred_fake       = D_model_B_train(fake_B)
-                
+
                 loss_GAN_A2B    = BCE_loss(pred_fake, y_real)
 
                 fake_A          = G_model_B2A_train(images_B)
                 pred_fake       = D_model_A_train(fake_A)
                 loss_GAN_B2A    = BCE_loss(pred_fake, y_real)
-                
+
                 recovered_A     = G_model_B2A_train(fake_B)
                 loss_cycle_ABA  = MSE_loss(recovered_A, images_A)
 
@@ -123,7 +180,7 @@ def fit_one_epoch(G_model_A2B_train, G_model_B2A_train, D_model_A_train, D_model
             scaler.scale(G_loss).backward()
             scaler.step(G_optimizer)
             scaler.update()
-            
+
             #---------------------------------#
             #   训练评价器A
             #---------------------------------#
@@ -142,7 +199,7 @@ def fit_one_epoch(G_model_A2B_train, G_model_B2A_train, D_model_A_train, D_model
             scaler.scale(D_loss_A).backward()
             scaler.step(D_optimizer_A)
             scaler.update()
-            
+
             #---------------------------------#
             #   训练评价器B
             #---------------------------------#
@@ -162,15 +219,15 @@ def fit_one_epoch(G_model_A2B_train, G_model_B2A_train, D_model_A_train, D_model
             scaler.scale(D_loss_B).backward()
             scaler.step(D_optimizer_B)
             scaler.update()
-                
+
         G_total_loss    += G_loss.item()
         D_total_loss_A  += D_loss_A.item()
         D_total_loss_B  += D_loss_B.item()
 
         if local_rank == 0:
-            pbar.set_postfix(**{'G_loss'    : G_total_loss / (iteration + 1), 
-                                'D_loss_A'  : D_total_loss_A / (iteration + 1), 
-                                'D_loss_B'  : D_total_loss_B / (iteration + 1), 
+            pbar.set_postfix(**{'G_loss'    : G_total_loss / (iteration + 1),
+                                'D_loss_A'  : D_total_loss_A / (iteration + 1),
+                                'D_loss_B'  : D_total_loss_B / (iteration + 1),
                                 'lr'        : get_lr(G_optimizer)})
             pbar.update(1)
 
@@ -180,7 +237,7 @@ def fit_one_epoch(G_model_A2B_train, G_model_B2A_train, D_model_A_train, D_model
     G_total_loss    = G_total_loss / epoch_step
     D_total_loss_A  = D_total_loss_A / epoch_step
     D_total_loss_B  = D_total_loss_B / epoch_step
-    
+
     if local_rank == 0:
         pbar.close()
         print('Epoch:'+ str(epoch + 1) + '/' + str(Epoch))

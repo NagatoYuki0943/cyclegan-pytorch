@@ -36,10 +36,10 @@ class CYCLEGAN(object):
     def __init__(self, **kwargs):
         self.__dict__.update(self._defaults)
         for name, value in kwargs.items():
-            setattr(self, name, value)  
-            self._defaults[name] = value 
+            setattr(self, name, value)
+            self._defaults[name] = value
         self.generate()
-        
+
         show_config(**self._defaults)
 
     def generate(self):
@@ -80,12 +80,12 @@ class CYCLEGAN(object):
         #   添加上batch_size维度
         #---------------------------------------------------------#
         image_data = np.expand_dims(np.transpose(preprocess_input(np.array(image_data, dtype='float32')), (2, 0, 1)), 0)
-        
+
         with torch.no_grad():
             images = torch.from_numpy(image_data)
             if self.cuda:
                 images = images.cuda()
-                
+
             #---------------------------------------------------#
             #   图片传入网络进行预测
             #---------------------------------------------------#
@@ -94,19 +94,19 @@ class CYCLEGAN(object):
             #   转为numpy
             #---------------------------------------------------#
             pr = pr.permute(1, 2, 0).cpu().numpy()
-            
+
             #--------------------------------------#
             #   将灰条部分截取掉
             #--------------------------------------#
             if nw is not None:
                 pr = pr[int((self.input_shape[0] - nh) // 2) : int((self.input_shape[0] - nh) // 2 + nh), \
                         int((self.input_shape[1] - nw) // 2) : int((self.input_shape[1] - nw) // 2 + nw)]
-                
+
             #---------------------------------------------------#
             #   进行图片的resize
             #---------------------------------------------------#
             pr = cv2.resize(pr, (orininal_w, orininal_h), interpolation = cv2.INTER_LINEAR)
-            
+
         image = postprocess_output(pr)
         image = Image.fromarray(np.uint8(image))
 

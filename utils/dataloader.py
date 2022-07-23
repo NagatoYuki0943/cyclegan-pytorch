@@ -11,10 +11,10 @@ class CycleGanDataset(Dataset):
         super(CycleGanDataset, self).__init__()
 
         self.annotation_lines_A = annotation_lines_A
-        self.annotation_lines_B = annotation_lines_B 
+        self.annotation_lines_B = annotation_lines_B
         self.length_A           = len(self.annotation_lines_A)
         self.length_B           = len(self.annotation_lines_B)
-        
+
         self.input_shape        = input_shape
 
     def __len__(self):
@@ -26,7 +26,7 @@ class CycleGanDataset(Dataset):
         image_A = cvtColor(image_A).resize([self.input_shape[1], self.input_shape[0]], Image.BICUBIC)
         image_A = np.array(image_A, dtype=np.float32)
         image_A = np.transpose(preprocess_input(image_A), (2, 0, 1))
-        
+
         index_B = index % self.length_B
         image_B = Image.open(self.annotation_lines_B[index_B].split(';')[1].split()[0])
         image_B = cvtColor(image_B).resize([self.input_shape[1], self.input_shape[0]], Image.BICUBIC)

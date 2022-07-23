@@ -230,6 +230,8 @@ if __name__ == "__main__":
     if True:
         #---------------------------------------#
         #   根据optimizer_type选择优化器
+        #   两个生成器使用同一个优化器(参数放在一起)
+        #   两个辨别器使用各自的优化器
         #---------------------------------------#
         G_optimizer = {
             'adam'  : optim.Adam(itertools.chain(G_model_A2B_train.parameters(), G_model_B2A_train.parameters()), lr=Init_lr, betas=(momentum, 0.999), weight_decay = weight_decay),
