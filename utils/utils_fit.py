@@ -35,15 +35,15 @@ def fit_one_epoch(G_model_A2B_train, G_model_B2A_train, D_model_A_train, D_model
             #   训练生成器A2B和B2A
             #   两个生成器使用同一个优化器(参数放在一起)
             #
-            #        images_A                              images_B
-            #       ┌───┴───┐                              ┌───┴───┐
-            #     B2A()     │                            A2B()     │
-            #       │       │                              │       │
-            #    Same_A     │                           Same_B     │
-            #       └───┬───┘                              └───┬───┘
-            #       MSE_loss()                             MSE_loss()
-            #           │                                      │
-            #    loss_identity_A                        loss_identity_B
+            #       images_B                               images_A
+            #       ┌───┴───┐                             ┌───┴───┐
+            #     A2B()     │                           B2A()     │
+            #       │       │                             │       │
+            #    Same_B     │                          Same_A     │
+            #       └───┬───┘                             └───┬───┘
+            #       MSE_loss()                            MSE_loss()
+            #           │                                     │
+            #    loss_identity_B                       loss_identity_A
             #
             #        images_A                              images_B
             #    ┌───────┤                             ┌───────┤
