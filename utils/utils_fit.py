@@ -113,7 +113,7 @@ def fit_one_epoch(G_model_A2B_train, G_model_B2A_train, D_model_A_train, D_model
             pred_real   = D_model_A_train(images_A)
             loss_D_real = BCE_loss(pred_real, y_real)
 
-            pred_fake   = D_model_A_train(fake_A.detach())
+            pred_fake   = D_model_A_train(fake_A.detach()) # detach the gradient
             loss_D_fake = BCE_loss(pred_fake, y_fake)
 
             D_loss_A    = (loss_D_real + loss_D_fake) * 0.5
@@ -137,7 +137,7 @@ def fit_one_epoch(G_model_A2B_train, G_model_B2A_train, D_model_A_train, D_model
             pred_real   = D_model_B_train(images_B)
             loss_D_real = BCE_loss(pred_real, y_real)
 
-            pred_fake   = D_model_B_train(fake_B.detach())
+            pred_fake   = D_model_B_train(fake_B.detach()) # detach the gradient
             loss_D_fake = BCE_loss(pred_fake, y_fake)
 
             D_loss_B = (loss_D_real + loss_D_fake) * 0.5
